@@ -7,7 +7,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green)]()
 
-A Spring Boot application that demonstrates **Model Context Protocol (MCP) server** implementation with real-world pet store management capabilities.
+A Spring Boot application that demonstrates **Model Context Protocol (MCP) server** implementation with real-world pet store management capabilities. This project builds a MCP Server on top of backend created by [this repo](https://github.com/adautomendes/petstore-ref-project).
 
 </div>
 
