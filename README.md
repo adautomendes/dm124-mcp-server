@@ -1,1 +1,1 @@
-# petstore-mcp-server
+# dm124-mcp-server
