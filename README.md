@@ -174,16 +174,24 @@ The server will start on `http://localhost:8082`
 
 #### 1. Using Docker Compose (Recommended)
 
-Start all services with one command:
+Two Docker Compose configurations are available:
 
+**Development Mode** (builds from source):
 ```bash
 cd /path/to/petstore-mcp-server
-docker compose up -d
+docker compose -f docker-compose.dev.yaml up -d
+```
+
+**Release Mode** (uses pre-built images):
+```bash
+cd /path/to/petstore-mcp-server
+docker compose -f docker-compose.release.yaml up -d
 ```
 
 The Docker Compose setup will:
-- Build the MCP Server from source (Dockerfile at [docker/Dockerfile](docker/Dockerfile))
-- Use pre-built images from Docker Hub for dependent services
+- **Development**: Build the MCP Server from source (Dockerfile at [docker/Dockerfile](docker/Dockerfile))
+- **Release**: Use the pre-built `adautomendes/petstore-mcp-server:latest` image from Docker Hub
+- Use pre-built images from Docker Hub for all dependent services
 - Create a network for service-to-service communication
 - Set up health checks for all services
 
@@ -197,11 +205,13 @@ Services will be available at:
 #### 2. Verify Services
 
 ```bash
-# Check all containers are running
-docker compose ps
+# Check all containers are running (adjust -f flag based on your compose file)
+docker compose -f docker-compose.dev.yaml ps
+# or
+docker compose -f docker-compose.release.yaml ps
 
 # View logs
-docker compose logs -f petstore-mcp-server
+docker compose -f docker-compose.dev.yaml logs -f petstore-mcp-server
 
 # Check service health
 curl http://localhost:8082/actuator/health
@@ -210,13 +220,17 @@ curl http://localhost:8082/actuator/health
 #### 3. Stop Services
 
 ```bash
-docker compose down
+# For development mode
+docker compose -f docker-compose.dev.yaml down
+
+# For release mode
+docker compose -f docker-compose.release.yaml down
 ```
 
 To remove volumes as well:
 
 ```bash
-docker compose down -v
+docker compose -f docker-compose.dev.yaml down -v
 ```
 
 ---
@@ -243,7 +257,7 @@ Configuration file: [application.properties](java/src/main/resources/application
 ```properties
 server.port=${SERVER_PORT:8082}
 spring.ai.mcp.server.name=petstore-mcp-server
-spring.ai.mcp.server.version=0.0.1
+spring.ai.mcp.server.version=1.0.0
 spring.ai.mcp.server.protocol=SSE
 ```
 
@@ -394,7 +408,7 @@ tool_use = {
   "capabilities": {},
   "info": {
     "name": "petstore-mcp-server",
-    "version": "0.0.1"
+    "version": "1.0.0"
   },
   "tools": [
     {
@@ -591,7 +605,11 @@ mvn clean package
 3. **If using Docker:**
 
 ```bash
-docker compose up -d --build
+# Development mode (builds from source)
+docker compose -f docker-compose.dev.yaml up -d --build
+
+# For production, build and push to Docker Hub, then use release mode
+docker compose -f docker-compose.release.yaml up -d
 ```
 
 The tool will automatically be registered with the MCP server and exposed to AI clients.
@@ -766,12 +784,50 @@ curl http://localhost:8082/actuator/info
 #### View Server Logs
 
 ```bash
-# Docker logs
-docker compose logs -f petstore-mcp-server
+# Docker logs (adjust -f flag based on your compose file)
+docker compose -f docker-compose.dev.yaml logs -f petstore-mcp-server
+# or
+docker compose -f docker-compose.release.yaml logs -f petstore-mcp-server
 
 # Real-time monitoring
-docker compose logs --tail=50 -f petstore-mcp-server
+docker compose -f docker-compose.dev.yaml logs --tail=50 -f petstore-mcp-server
 ```
+
+---
+
+## CI/CD Pipeline
+
+### Jenkins Pipeline
+
+The project includes a Jenkins pipeline at [cicd/build-and-push.groovy](cicd/build-and-push.groovy) that automates the build and push process.
+
+#### Pipeline Stages
+
+1. **Clean Workspace** - Removes previous build artifacts
+2. **Clone Repositories** - Clones both petstore-ref-project and petstore-mcp-server repositories in parallel
+3. **Docker Build** - Builds Docker images for all services in parallel:
+   - Petstore Auth
+   - Petstore Monitor
+   - Petstore Core
+   - Petstore MCP Server
+4. **Docker Tagging and Pushing** - Tags and pushes all images to Docker Hub:
+   - Versions extracted from `package.json` (Node.js services) and `pom.xml` (Java MCP server)
+   - Pushes both `latest` and versioned tags
+
+#### Running the Pipeline
+
+```groovy
+// Pipeline automatically:
+// 1. Builds images from both repositories
+// 2. Tags with version numbers (e.g., 1.0.0)
+// 3. Pushes to adautomendes/petstore-* on Docker Hub
+```
+
+#### Prerequisites
+
+- Jenkins with Docker installed
+- Docker Hub credentials configured as `dockerhub-credentials`
+- Access to GitHub repositories
 
 ---
 
@@ -826,3 +882,5 @@ docker compose logs --tail=50 -f petstore-mcp-server
 - **Spring AI Documentation**: https://spring.io/projects/spring-ai
 - **Model Context Protocol**: https://modelcontextprotocol.io/
 - **Docker Documentation**: https://docs.docker.com/
+
+---

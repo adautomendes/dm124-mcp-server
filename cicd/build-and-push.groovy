@@ -5,6 +5,10 @@ def petstoreRefProjects = [
     'monitor',
     'core'
 ]
+
+def petstoreMcpServerRepo = 'https://github.com/adautomendes/petstore-mcp-server.git'
+def petstoreMcpServerDir = 'petstore-mcp-server'
+
 def dockerhubUsername = 'adautomendes'
 def dockerhubImagePrefix = 'petstore'
 
@@ -17,10 +21,21 @@ pipeline {
                 cleanWs()
             }
         }
-        stage('Clone DM124 Repository') {
-            steps {
-                script {
-                    sh "git clone ${petstoreRefRepo} ${petstoreRefDir}"
+        stage('Clone repositories') {
+            parallel {
+                stage('Petstore MCP Server') {
+                    steps {
+                        script {
+                            sh "git clone ${petstoreMcpServerRepo} ${petstoreMcpServerDir}"
+                        }
+                    }
+                }
+                stage('Petstore Reference') {
+                    steps {
+                        script {
+                            sh "git clone ${petstoreRefRepo} ${petstoreRefDir}"
+                        }
+                    }
                 }
             }
         }
@@ -34,6 +49,15 @@ pipeline {
                             }
                         }]
                     }
+
+                    parallelStages += [
+                        "petstore-mcp-server image build": {
+                            dir("${petstoreMcpServerDir}") {
+                                sh "docker build -t ${dockerhubUsername}/petstore-mcp-server:latest -f ./docker/Dockerfile ."
+                            }
+                        }
+                    ]
+
                     parallel parallelStages
                 }
             }
@@ -60,6 +84,27 @@ pipeline {
                             }
                         }]
                     }
+
+                    parallelStages += [
+                        "petstore-mcp-server push": {
+                            dir("${petstoreMcpServerDir}") {
+                                script {
+                                    def version = sh(script: "mvn help:evaluate -f java/pom.xml -Dexpression=project.version -q -DforceStdout", returnStdout: true).trim()
+
+                                    println "Petstore MCP Server version is: ${version}"
+
+                                    sh "docker tag ${dockerhubUsername}/petstore-mcp-server:latest ${dockerhubUsername}/petstore-mcp-server:${version}"
+
+                                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                                        sh "echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin"
+                                        sh "docker push ${dockerhubUsername}/petstore-mcp-server:latest"
+                                        sh "docker push ${dockerhubUsername}/petstore-mcp-server:${version}"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+
                     parallel parallelStages
                 }
             }

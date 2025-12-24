@@ -1,0 +1,100 @@
+services:
+  petstore-mongo:
+    image: "mongo"
+    container_name: "petstore-mongo"
+    restart: unless-stopped
+    command:
+      - '--logpath'
+      - '/var/log/mongodb/mongod.log'
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - services-network
+
+  petstore-auth:
+    image: "adautomendes/petstore-auth:latest"
+    container_name: "petstore-auth"
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=prod
+      - TOKEN_EXP=1d
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - services-network
+
+  petstore-monitor:
+    image: "adautomendes/petstore-monitor:latest"
+    container_name: "petstore-monitor"
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - services-network
+
+  petstore-core:
+    image: "adautomendes/petstore-core:latest"
+    container_name: "petstore-core"
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=prod
+      - MONGODB_HOST=petstore-mongo
+      - MONGODB_PORT=27017
+      - MONGODB_DBNAME=petstore-core
+      - AUTH_SERVER=http://petstore-auth:3001
+      - MONITOR_SERVER=http://petstore-monitor:3002
+    depends_on:
+      petstore-auth:
+        condition: service_healthy
+      petstore-mongo:
+        condition: service_healthy
+      petstore-monitor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - services-network
+
+  petstore-mcp-server:
+    image: "adautomendes/petstore-mcp-server:latest"
+    container_name: "petstore-mcp-server"
+    ports:
+      - "8082:8082"
+    environment:
+      - SERVER_PORT=8082
+      - PETSTORE_AUTH_HOST=petstore-auth
+      - PETSTORE_AUTH_PORT=3001
+      - PETSTORE_CORE_HOST=petstore-core
+      - PETSTORE_CORE_PORT=3000
+    depends_on:
+      petstore-core:
+        condition: service_healthy
+    networks:
+      - services-network
+
+networks:
+  services-network:
+    driver: bridge

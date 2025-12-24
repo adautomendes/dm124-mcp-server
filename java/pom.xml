@@ -12,7 +12,7 @@
 
     <groupId>com.adauto.mcp</groupId>
     <artifactId>petstore-mcp-server</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
 
     <name>Spring AI MCP Sample</name>
     <description>Sample Spring Boot application demonstrating MCP server usage</description>
